@@ -1,0 +1,46 @@
+Centos 8 - OpenStack-ussuri kurulumu
+
+3 Silahşörler
+controller / compute / storage
+
+Hepsine 3 interface tanımladık
+enp0s3 - nat
+enp0s8 - host only adapter - vboxnet0
+enp0s9 - host only adapter - vboxnet1
+
+/etc/sysconfig/network-scripts/ifcfg-enp0s*
+
+# enp0s3 #
+TYPE=Ethernet
+PROXY_METHOD=none
+BROWSER_ONLY=no
+BOOTPROTO=dhcp
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+ONBOOT=yes
+
+# enp0s8 # 
+TYPE=Ethernet
+PROXY_METHOD=none
+BROWSER_ONLY=no
+BOOTPROTO=static
+IPADDR=192.168.8.31
+NETMASK=255.255.255.0
+GATEWAY=192.168.17.1
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+ONBOOT=yes
+
+# enp0s9 # 
+TYPE=Ethernet
+PROXY_METHOD=none
+BROWSER_ONLY=no
+BOOTPROTO=none
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+ONBOOT=yes
+
+
+/etc/resolv.conf
+nameserver 1.1.1.1
+nameserver 8.8.4.4

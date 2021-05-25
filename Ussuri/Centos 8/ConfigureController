@@ -1,0 +1,62 @@
+# controller #
+
+#enable powertools repo
+[root@controller ~]# dnf config-manager --enable powertools
+
+#install openstack ussuri
+[root@controller ~]# dnf install -y centos-release-openstack-ussuri
+
+#update current packs
+[root@controller ~]# dnf update -y
+
+#now let's install the important packs with dependencies like
+#neutronclient, novaclient, openstacksdk, oslo-config/utils, keyring...
+dnf install python3-openstackclient openstack-selinux	
+#will enable the module streams for container-tools and python36
+
+dnf -y install mariadb mariadb-server python3-PyMySQL
+
+#create a config file for openstack & mariadb
+[root@controller ~]# vi /etc/my.cnf.d/openstack.cnf
+
+#mandatory settings for openstack.cnf;
+[mysqld]
+bind-address = 192.168.8.11
+default-storage-engine = innodb
+innodb_file_per_table = on
+max_connections = 4096
+collation-server = utf8_general_ci
+character-set-server = utf8
+
+#enable and start mariadb service
+[root@controller ~]# systemctl enable mariadb.service
+[root@controller ~]# systemctl start mariadb.service
+
+# https://mariadb.com/kb/en/mysql_secure_installation/
+[root@controller ~]# mysql_secure_installation
+
+#Enter current pw... press enter for none for the first time
+#Define root pw after answer q as Y
+Set root password? [Y/n] y
+
+Remove anonymous users? [Y/n] y
+
+Disallow root login remotely? [Y/n] y
+
+Remove test database and access to it? [Y/n] y
+
+Reload privilege tables now? [Y/n] y
+
+#
+[root@controller ~]# firewall-cmd --permanent --add-service=mysql
+[root@controller ~]# firewall-cmd --reload
+
+#powertools enable
+[root@controller ~]# dnf config-manager --set-enabled powertools
+#install rabbitmq
+[root@controller ~]# dnf -y install rabbitmq-server
+#enable rabbitmq service and start
+[root@controller ~]# systemctl enable rabbitmq-server.service
+[root@controller ~]# systemctl start rabbitmq-server.service
+
+
