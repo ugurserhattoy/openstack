@@ -59,4 +59,52 @@ Reload privilege tables now? [Y/n] y
 [root@controller ~]# systemctl enable rabbitmq-server.service
 [root@controller ~]# systemctl start rabbitmq-server.service
 
+#rabbitmq user create rabbitmqctl add_user <username> <password>
+[root@controller ~]# rabbitmqctl add_user openstack password
+#set permissions for openstack in /
+[root@controller ~]# rabbitmqctl set_permissions openstack ".*" ".*" ".*"
+#open the port for rabbitmq
+[root@controller ~]# firewall-cmd --permanent --add-port={11211/tcp,5672/tcp}
+#reload firewall
+[root@controller ~]# firewall-cmd --reload
+
+#install memcached 
+#https://docs.openstack.org/ocata/ha-guide-draft/intro-os-ha-memcached.html#
+[root@controller ~]# dnf -y install memcached python3-memcached
+#configure memcached file && add controller to options
+[root@controller ~]# vi /etc/sysconfig/memcached
+OPTIONS="-l 127.0.0.1,::1,controller"
+#enable && start memcached.service
+[root@controller ~]# systemctl enable memcached.service
+[root@controller ~]# systemctl start memcached.service
+#don't forget to check the status; must be active
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
