@@ -79,9 +79,29 @@ OPTIONS="-l 127.0.0.1,::1,controller"
 [root@controller ~]# systemctl start memcached.service
 #don't forget to check the status; must be active
 
+#install etcd
+#https://docs.openstack.org/install-guide/environment-etcd.html
+[root@controller ~]# dnf -y install etcd
+#open etcd.conf file
+[root@controller ~]# vi /etc/etcd/etcd.conf
+#192.168.8.11 is controller's enp0s8 static ip
+#make the changes for the variables below, remove hash signs and save
+ETCD_LISTEN_PEER_URLS="http://192.168.8.11:2380"
+ETCD_LISTEN_CLIENT_URLS="http://192.168.8.11:2379"
+ETCD_NAME="controller"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://192.168.8.11:2380"
+ETCD_ADVERTISE_CLIENT_URLS="http://192.168.8.11:2379"
+ETCD_INITIAL_CLUSTER="controller=http://192.168.8.11:2380"
+ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-os"
+ETCD_INITIAL_CLUSTER_STATE="new"
+#emable, start and check status of etcd
+[root@controller ~]# systemctl enable etcd
+[root@controller ~]# systemctl start etcd
+[root@controller ~]# systemctl status etcd
 
-
-
+#add permanent port exception for etcd and reload rules
+[root@controller ~]# firewall-cmd --permanent --add-port={2380/tcp,2379/tcp}
+[root@controller ~]# firewall-cmd --reload
 
 
 
