@@ -1,4 +1,4 @@
-# controller #
+## controller ##
 
 #enable powertools repo
 [root@controller ~]# dnf config-manager --enable powertools
@@ -103,16 +103,43 @@ ETCD_INITIAL_CLUSTER_STATE="new"
 [root@controller ~]# firewall-cmd --permanent --add-port={2380/tcp,2379/tcp}
 [root@controller ~]# firewall-cmd --reload
 
+#check chrony
+[root@controller ~]# systemctl status chronyd
+#config. chrony.conf file internal machines take the default values here
+[root@controller ~]# vi /etc/chrony.conf
+# Allow NTP client access from local network. enp0s3's block
+allow 192.168.8.0/24
+#restart chrony service && check the status
+[root@controller ~]# systemctl restart chronyd
+
+#check mariadb
+[root@controller ~]# mysql -uroot -p
+MariaDB [(none)]>
+
+#add firewall rule for ntp service && reload
+[root@controller ~]# firewall-cmd --permanent --add-service=ntp
+[root@controller ~]# firewall-cmd --reload
 
 
 
+## compute && storage nodes same steps ##
 
+#chrony.conf edit pool adres from 2.centos... to controller
+[root@compute ~]# vi /etc/chrony.conf
+pool controller iburst
+#restart chrony
+[root@compute ~]# systemctl restart chronyd
 
+#add fw rule for ntp && reload
+[root@compute ~]# firewall-cmd --permanent --add-service=ntp
+[root@compute ~]# firewall-cmd --reload
 
-
-
-
-
+#check if it returns controller as time source
+[root@compute ~]# chronyc sources
+210 Number of sources = 1
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+^? controller                    0   7     0     -     +0ns[   +0ns] +/-    0ns
 
 
 
