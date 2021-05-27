@@ -142,6 +142,234 @@ MS Name/IP address         Stratum Poll Reach LastRx Last sample
 ^? controller                    0   7     0     -     +0ns[   +0ns] +/-    0ns
 
 
+## controller - keystone ##
+
+# https://docs.openstack.org/keystone/latest/install/index-rdo.html
+
+#create a user to use openstack <-> keystone
+[root@controller ~]# echo "ostack ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ostack
+[root@controller ~]# adduser ostack
+
+#login MariaDB as root
+[root@controller ~]# mysql -uroot -p
+
+#create keystone db and grant access
+MariaDB [(none)]> CREATE DATABASE keystone;
+
+MariaDB [(none)]> GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'localhost' \
+    -> IDENTIFIED BY 'YOUR_KEYSTONE_DBPASS';
+
+MariaDB [(none)]> GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' \
+    -> IDENTIFIED BY 'YOUR_KEYSTONE_DBPASS';
+    
+#install required packages
+[root@controller ~]# dnf -y install openstack-keystone httpd python3-mod_wsgi
+[root@controller ~]# dnf -y install mod_ssl python3-oauth2client
+
+#Edit the keystone.conf file
+[root@controller /]# vi /etc/keystone/keystone.conf
+
+memcache_servers = controller:11211
+#in the database section config. database access
+[database]
+connection = mysql+pymysql://keystone:YOUR_KEYSTONE_DBPASS@controller/keystone
+#in the token section uncomment provider line
+[token]
+# ...
+provider = fernet
+
+#populate the identify service database (may take a while)
+[root@controller /]# su -s /bin/sh -c "keystone-manage db_sync" keystone
+
+#check if db and tables created
+[root@controller /]# mysql -uroot -p
+MariaDB [(none)]> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| keystone           |
+| mysql              |
+| performance_schema |
++--------------------+
+
+MariaDB [(none)]> use keystone;
+
+MariaDB [keystone]> show tables;
++------------------------------------+
+| Tables_in_keystone                 |
++------------------------------------+
+| access_rule                        |
+| access_token                       |
+| application_credential             |
+| application_credential_access_rule |
+| application_credential_role        |
+| assignment                         |
+| config_register                    |
+| consumer                           |
+| credential                         |
+| endpoint                           |
+| endpoint_group                     |
+| expiring_user_group_membership     |
+| federated_user                     |
+| federation_protocol                |
+| group                              |
+| id_mapping                         |
+| identity_provider                  |
+| idp_remote_ids                     |
+| implied_role                       |
+| limit                              |
+| local_user                         |
+| mapping                            |
+| migrate_version                    |
+| nonlocal_user                      |
+| password                           |
+| policy                             |
+| policy_association                 |
+| project                            |
+| project_endpoint                   |
+| project_endpoint_group             |
+| project_option                     |
+| project_tag                        |
+| region                             |
+| registered_limit                   |
+| request_token                      |
+| revocation_event                   |
+| role                               |
+| role_option                        |
+| sensitive_config                   |
+| service                            |
+| service_provider                   |
+| system_assignment                  |
+| token                              |
+| trust                              |
+| trust_role                         |
+| user                               |
+| user_group_membership              |
+| user_option                        |
+| whitelisted_config                 |
++------------------------------------+
+49 rows in set (0.000 sec)
+
+
+#configure keystone user 
+#initialize fernet key repo
+[root@controller /]# keystone-manage fernet_setup --keystone-user keystone --keystone-group keystone
+[root@controller /]# keystone-manage credential_setup --keystone-user keystone --keystone-group keystone
+
+#bootstrap the identity service
+[root@controller /]# keystone-manage bootstrap --bootstrap-password pw \
+>   --bootstrap-admin-url http://controller:5000/v3/ \
+>   --bootstrap-internal-url http://controller:5000/v3/ \
+>   --bootstrap-public-url http://controller:5000/v3/ \
+>   --bootstrap-region-id RegionOne
+
+#set selinux booleans to allow httpd connections and access
+[root@controller /]# setsebool -P httpd_use_openstack on
+[root@controller /]# setsebool -P httpd_can_network_connect on
+[root@controller /]# setsebool -P httpd_can_network_connect_db on
+
+#add fw rule for the port and reload
+[root@controller /]# firewall-cmd --add-port=5000/tcp --permanent
+[root@controller /]# firewall-cmd --reload
+
+#configure the Apache HTTP server
+#edit httpd.conf file
+[root@controller /]# vi /etc/httpd/conf/httpd.conf
+
+ServerName controller
+
+#create a sym. link to wsgi-keystone.conf
+[root@controller /]# ln -s /usr/share/keystone/wsgi-keystone.conf /etc/httpd/conf.d/
+
+#start the Apache HTTP service and enable
+[root@controller /]# systemctl enable httpd.service
+[root@controller /]# systemctl start httpd.service
+
+#switch to ostack and configure administrative account by env. variables
+[root@controller /]# su - ostack
+[ostack@controller ~]$ export OS_USERNAME=admin
+[ostack@controller ~]$ export OS_PASSWORD=pw
+[ostack@controller ~]$ export OS_PROJECT_NAME=admin
+[ostack@controller ~]$ export OS_USER_DOMAIN_NAME=Default
+[ostack@controller ~]$ export OS_PROJECT_DOMAIN_NAME=Default
+[ostack@controller ~]$ export OS_AUTH_URL=http://controller:5000/v3
+[ostack@controller ~]$ export OS_IDENTITY_API_VERSION=3
+
+#be sure mysql and memcache service rules and 5672/tcp port rule added to fw
+
+#let's test if keystone features work fine;
+#https://docs.openstack.org/keystone/pike/install/keystone-users-obs.html
+#create domain, projects, users, roles...
+[ostack@controller ~]$ openstack domain create --description "Test Domain" tested
+[ostack@controller ~]$ openstack project create --domain tested --description "test service" testserv
+[ostack@controller ~]$ openstack project list
++----------------------------------+----------+
+| ID                               | Name     |
++----------------------------------+----------+
+| 2a980204049d4a6ca41eeda1c308bae2 | admin    |
+| 8277815379344ce39649b0e086feeaee | testserv |
++----------------------------------+----------+
+[ostack@controller ~]$ openstack project create --domain default --description "ust project" ust
+[ostack@controller ~]$ openstack user create --domain default --password PASSWORD ust
+[ostack@controller ~]$ openstack role create testusers
+[ostack@controller ~]$ openstack role set --description "test user's role" testusers
+[ostack@controller ~]$ openstack role show testusers
++-------------+----------------------------------+
+| Field       | Value                            |
++-------------+----------------------------------+
+| description | test user's role                 |
+| domain_id   | None                             |
+| id          | f7a0d63698d9447c8ea86e7f87916cad |
+| name        | testusers                        |
+| options     | {}                               |
++-------------+----------------------------------+
+[ostack@controller ~]$ openstack role add --project ust --user ust testusers
+
+
+#Verify operation of the Identity service before installing other services
+#https://docs.openstack.org/keystone/pike/install/keystone-verify-obs.html
+#Unset the temporary OS_AUTH_URL and OS_PASSWORD environment variable
+[ostack@controller ~]$ unset OS_AUTH_URL OS_PASSWORD
+[ostack@controller /]$ openstack --os-auth-url http://controller:5000/v3 \
+>   --os-project-domain-name Default --os-user-domain-name Default \
+>   --os-project-name admin --os-username admin token issue
+
+[ostack@controller /]$ openstack --os-auth-url http://controller:5000/v3 \
+>  --os-project-domain-name Default --os-user-domain-name Default \
+>  --os-project-name ust --os-username ust token issue
+
+
+#create client env. scripts for projects and users to load later operations
+#https://docs.openstack.org/keystone/pike/install/keystone-openrc-obs.html
+#create and edit the admin-openrc file and add the following content
+export OS_PROJECT_DOMAIN_NAME=Default
+export OS_USER_DOMAIN_NAME=Default
+export OS_PROJECT_NAME=admin
+export OS_USERNAME=admin
+export OS_PASSWORD=ADMIN_PASS
+export OS_AUTH_URL=http://controller:35357/v3
+export OS_IDENTITY_API_VERSION=3
+export OS_IMAGE_API_VERSION=2
+
+#do same for ust-openrc too.
+#now we can get the token like below
+[ostack@controller ~]$ . admin-openrc
+[ostack@controller ~]$ openstack token issue
+[ostack@controller ~]$ . ust-openrc
+[ostack@controller ~]$ openstack token issue
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
