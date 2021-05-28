@@ -352,7 +352,8 @@ export OS_AUTH_URL=http://controller:35357/v3
 export OS_IDENTITY_API_VERSION=3
 export OS_IMAGE_API_VERSION=2
 
-#do same for ust-openrc too.
+#do the same for your_user-openrc (ust-openrc for me) too.
+
 #now we can get the token like below
 [ostack@controller ~]$ . admin-openrc
 [ostack@controller ~]$ openstack token issue
