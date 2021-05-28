@@ -43,3 +43,117 @@ MariaDB [(none)]> exit
 >   image internal http://controller:9292
 [ostack@controller ~]$ openstack endpoint create --region RegionOne \
 >   image admin http://controller:9292
+
+#install glance from ussuri and powertools
+[root@controller ~]# dnf --enablerepo=centos-openstack-ussuri,powertools -y install openstack-glance wget
+
+#configure components#
+#glance-api.conf https://docs.openstack.org/glance/pike/configuration/glance_api.html
+[root@controller ~]# vi /etc/glance/glance-api.conf
+
+#database section
+[database]
+connection = mysql+pymysql://glance:YOUR_GLANCE_DBPASS@controller/glance
+
+#glance_store section
+[glance_store]
+stores = file,http
+default_store = file
+filesystem_store_datadir = /var/lib/glance/images/
+
+#keystone_authtoken section
+[keystone_authtoken]
+www_authenticate_uri  = http://controller:5000
+auth_url = http://controller:5000
+memcached_servers = controller:11211
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = glance
+password = YOUR_GLANCE_PASS
+
+#paste_deploy section
+[paste_deploy]
+# ...
+flavor = keystone
+
+#save and quit
+
+#change permissions and owner for glance-api.conf
+[root@controller ~]# chmod 640 /etc/glance/glance-api.conf
+[root@controller ~]# chown root:glance /etc/glance/glance-api.conf
+
+#populate the image service db
+[root@controller ~]# su -s /bin/sh -c "glance-manage db_sync" glance
+
+#selinux boolean for glance
+[root@controller ~]# setsebool -P glance_api_can_network on
+
+#create glanceapi.te file
+[root@controller ~]# vi glanceapi.te
+#copy&&paste below before ">>>>>" sign
+module glanceapi 1.0;
+
+require {
+        type glance_api_t;
+        type httpd_config_t;
+        type iscsid_exec_t;
+        class dir search;
+        class file { getattr open read };
+}
+
+#========== glance_api_t ============
+allow glance_api_t httpd_config_t:dir search;
+allow glance_api_t iscsid_exec_t:file { getattr open read};
+>>>>>
+#save and exit
+#compile policy for selinux
+[root@controller ~]# checkmodule -m -M -o glanceapi.mod glanceapi.te
+#create selinux module package
+[root@controller ~]# semodule_package --outfile glanceapi.pp --module glanceapi.mod
+#install module package
+[root@controller ~]# semodule -i glanceapi.pp
+
+#enable and start service
+[root@controller ~]# systemctl enable openstack-glance-api.service
+[root@controller ~]# systemctl start openstack-glance-api.service
+#allow service ports and reload rules
+[root@controller ~]# firewall-cmd --permanent --add-port={9191,9292}/tcp
+[root@controller ~]# firewall-cmd --reload
+
+#let's test glance
+[ostack@controller ~]$ . admin-openrc 
+[ostack@controller ~]$ wget http://download.cirros-cloud.net/0.5.1/cirros-0.5.1-x86_64-disk.img
+
+[ostack@controller ~]$ openstack image create "cirros" --file cirros-0.5.2-x86_64-disk.img \
+--disk-format raw --container-format bare --public
+[ostack@controller ~]$ openstack image list
++--------------------------------------+--------+--------+
+| ID                                   | Name   | Status |
++--------------------------------------+--------+--------+
+| 0f5383b4-44ca-4b4b-b5b4-b55ecb1ea5d1 | cirros | active |
++--------------------------------------+--------+--------+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
