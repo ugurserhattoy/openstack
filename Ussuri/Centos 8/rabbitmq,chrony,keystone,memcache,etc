@@ -60,7 +60,7 @@ Reload privilege tables now? [Y/n] y
 [root@controller ~]# systemctl start rabbitmq-server.service
 
 #rabbitmq user create rabbitmqctl add_user <username> <password>
-[root@controller ~]# rabbitmqctl add_user openstack password
+[root@controller ~]# rabbitmqctl add_user openstack <password>
 #set permissions for openstack in /
 [root@controller ~]# rabbitmqctl set_permissions openstack ".*" ".*" ".*"
 #open the port for rabbitmq

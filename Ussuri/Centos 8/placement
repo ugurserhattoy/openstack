@@ -1,0 +1,60 @@
+## controller - placement ##
+
+[ostack@controller ~]$ mysql -u root -p
+#
+MariaDB [(none)]> CREATE DATABASE placement;
+#
+MariaDB [(none)]> GRANT ALL PRIVILEGES ON placement.* TO 'placement'@'localhost' \
+  IDENTIFIED BY 'YOUR_PLACEMENT_DBPASS';
+MariaDB [(none)]> GRANT ALL PRIVILEGES ON placement.* TO 'placement'@'%' \
+  IDENTIFIED BY 'YOUR_PLACEMENT_DBPASS';
+# 
+[ostack@controller ~]$ openstack user create --domain default --password-prompt placement
+User Password: YOUR_PLACEMENT_DBPASS
+Repeat User Password: YOUR_PLACEMENT_DBPASS
+#
+[ostack@controller ~]$ openstack role add --project service --user placement admin
+#
+[ostack@controller ~]$ openstack service create --name placement \
+>   --description "ust Placement API" placement
+#
+[ostack@controller ~]$ openstack endpoint create --region RegionOne \
+>   placement public http://controller:8778
+
+[ostack@controller ~]$ openstack endpoint create --region RegionOne \
+>   placement internal http://controller:8778
+
+[ostack@controller ~]$ openstack endpoint create --region RegionOne \
+>   placement admin http://controller:8778
+#
+[root@controller ~]# dnf -y install openstack-placement-api
+#
+[root@controller ~]# vi /etc/placement/placement.conf
+>>>
+[placement_database]
+# ...
+connection = mysql+pymysql://placement:YOUR_PLACEMENT_DBPASS@controller/placement
+
+[api]
+# ...
+auth_strategy = keystone
+
+[keystone_authtoken]
+# ...
+auth_url = http://controller:5000/v3
+memcached_servers = controller:11211
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = placement
+password = YOUR_PLACEMENT_PASS
+>>> #save&&exit
+#
+[root@controller ~]# su -s /bin/sh -c "placement-manage db sync" placement
+[root@controller ~]# systemctl restart httpd
+#
+[root@controller ~]# firewall-cmd --add-port={8778/tcp,9696/tcp} --permanent
+[root@controller ~]# firewall-cmd --reload
+[root@controller ~]# semanage port -a -t http_port_t -p tcp 8778
+
