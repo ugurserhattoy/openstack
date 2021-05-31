@@ -163,9 +163,26 @@ memcache_servers = controller:11211
 ### in this step, install and configure placement. After that start to install&&config.
 ### nova but make a pause just after editing nova.conf file and return here
 
+#
+[root@controller ~]# ln -s /etc/neutron/plugins/ml2/ml2_conf.ini /etc/neutron/plugin.ini
 
+#
+[root@controller ~]# su -s /bin/sh -c "neutron-db-manage --config-file /etc/neutron/neutron.conf \
+>   --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head" neutron
 
+#
+[root@controller ~]# systemctl restart openstack-nova-api.service
+#
+[root@controller ~]# systemctl enable neutron-server.service \
+>   neutron-linuxbridge-agent.service neutron-dhcp-agent.service \
+>   neutron-metadata-agent.service
 
+[root@controller ~]# systemctl start neutron-server.service \
+>   neutron-linuxbridge-agent.service neutron-dhcp-agent.service \
+>   neutron-metadata-agent.service
+
+[root@controller ~]# systemctl enable neutron-l3-agent.service
+[root@controller ~]# systemctl start neutron-l3-agent.service
 
 
 
