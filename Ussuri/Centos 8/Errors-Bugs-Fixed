@@ -1,0 +1,27 @@
+###Fix below###
+
+====================memcached========================
+#memcache daemon is getting failed after reboot the controller
+
+memcached.service - memcached daemon
+   Loaded: loaded (/usr/lib/systemd/system/memcached.service; enabled; vendor preset: disabled)
+   Active: failed (Result: exit-code) since Mon 2021-05-31 06:06:36 EDT; 8min ago
+  Process: 913 ExecStart=/usr/bin/memcached -p ${PORT} -u ${USER} -m ${CACHESIZE} -c ${MAXCONN} $OPTION>
+ Main PID: 913 (code=exited, status=71)
+ 
+#1.set limits for memcached / DIDN'T WORK
+[root@controller ~]# vi /etc/security/limits.conf
+# Username      type    item           value
+memcached       soft    nofile          5000
+memcached       hard    nofile          6144
+ 
+#2.checked ports if 11211 was already listening / DIDN'T WORK
+
+================openstack-nova-api.service============== SOLVED!
+[root@controller ~]# systemctl status openstack-nova-api.service
+● openstack-nova-api.service - OpenStack Nova API Server
+   Loaded: loaded (/usr/lib/systemd/system/openstack-nova-api.service; disabled; vendor preset: disable>
+   Active: inactive (dead)
+
+#enabled service again / SOLVED ^^
+systemctl enable openstack-nova-api.service 

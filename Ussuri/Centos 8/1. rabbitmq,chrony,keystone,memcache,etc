@@ -1,0 +1,172 @@
+## controller ##
+
+#enable powertools repo
+[root@controller ~]# dnf config-manager --enable powertools
+
+#install openstack ussuri
+[root@controller ~]# dnf install -y centos-release-openstack-ussuri
+
+#update current packs
+[root@controller ~]# dnf update -y
+
+#now let's install the important packs with dependencies like
+#neutronclient, novaclient, openstacksdk, oslo-config/utils, keyring...
+dnf install python3-openstackclient openstack-selinux	
+#will enable the module streams for container-tools and python36
+
+dnf -y install mariadb mariadb-server python3-PyMySQL
+
+#create a config file for openstack & mariadb
+[root@controller ~]# vi /etc/my.cnf.d/openstack.cnf
+
+#mandatory settings for openstack.cnf;
+[mysqld]
+bind-address = 192.168.8.11
+default-storage-engine = innodb
+innodb_file_per_table = on
+max_connections = 4096
+collation-server = utf8_general_ci
+character-set-server = utf8
+
+#enable and start mariadb service
+[root@controller ~]# systemctl enable mariadb.service
+[root@controller ~]# systemctl start mariadb.service
+
+# https://mariadb.com/kb/en/mysql_secure_installation/
+[root@controller ~]# mysql_secure_installation
+
+#Enter current pw... press enter for none for the first time
+#Define root pw after answer q as Y
+Set root password? [Y/n] y
+
+Remove anonymous users? [Y/n] y
+
+Disallow root login remotely? [Y/n] y
+
+Remove test database and access to it? [Y/n] y
+
+Reload privilege tables now? [Y/n] y
+
+#
+[root@controller ~]# firewall-cmd --permanent --add-service=mysql
+[root@controller ~]# firewall-cmd --reload
+
+#powertools enable
+[root@controller ~]# dnf config-manager --set-enabled powertools
+#install rabbitmq
+[root@controller ~]# dnf -y install rabbitmq-server
+#enable rabbitmq service and start
+[root@controller ~]# systemctl enable rabbitmq-server.service
+[root@controller ~]# systemctl start rabbitmq-server.service
+
+#rabbitmq user create rabbitmqctl add_user <username> <password>
+[root@controller ~]# rabbitmqctl add_user openstack <password>
+#set permissions for openstack in /
+[root@controller ~]# rabbitmqctl set_permissions openstack ".*" ".*" ".*"
+#open the port for rabbitmq
+[root@controller ~]# firewall-cmd --permanent --add-port={11211/tcp,5672/tcp}
+#reload firewall
+[root@controller ~]# firewall-cmd --reload
+
+#install memcached 
+#https://docs.openstack.org/ocata/ha-guide-draft/intro-os-ha-memcached.html#
+[root@controller ~]# dnf -y install memcached python3-memcached
+#configure memcached file && add controller to options
+[root@controller ~]# vi /etc/sysconfig/memcached
+OPTIONS="-l 127.0.0.1,::1,controller"
+#enable && start memcached.service
+[root@controller ~]# systemctl enable memcached.service
+[root@controller ~]# systemctl start memcached.service
+#don't forget to check the status; must be active
+
+#install etcd
+#https://docs.openstack.org/install-guide/environment-etcd.html
+[root@controller ~]# dnf -y install etcd
+#open etcd.conf file
+[root@controller ~]# vi /etc/etcd/etcd.conf
+#192.168.8.11 is controller's enp0s8 static ip
+#make the changes for the variables below, remove hash signs and save
+ETCD_LISTEN_PEER_URLS="http://192.168.8.11:2380"
+ETCD_LISTEN_CLIENT_URLS="http://192.168.8.11:2379"
+ETCD_NAME="controller"
+ETCD_INITIAL_ADVERTISE_PEER_URLS="http://192.168.8.11:2380"
+ETCD_ADVERTISE_CLIENT_URLS="http://192.168.8.11:2379"
+ETCD_INITIAL_CLUSTER="controller=http://192.168.8.11:2380"
+ETCD_INITIAL_CLUSTER_TOKEN="etcd-cluster-os"
+ETCD_INITIAL_CLUSTER_STATE="new"
+#emable, start and check status of etcd
+[root@controller ~]# systemctl enable etcd
+[root@controller ~]# systemctl start etcd
+[root@controller ~]# systemctl status etcd
+
+#add permanent port exception for etcd and reload rules
+[root@controller ~]# firewall-cmd --permanent --add-port={2380/tcp,2379/tcp}
+[root@controller ~]# firewall-cmd --reload
+
+#check chrony
+[root@controller ~]# systemctl status chronyd
+#config. chrony.conf file internal machines take the default values here
+[root@controller ~]# vi /etc/chrony.conf
+# Allow NTP client access from local network. enp0s3's block
+allow 192.168.8.0/24
+#restart chrony service && check the status
+[root@controller ~]# systemctl restart chronyd
+
+#check mariadb
+[root@controller ~]# mysql -uroot -p
+MariaDB [(none)]>
+
+#add firewall rule for ntp service && reload
+[root@controller ~]# firewall-cmd --permanent --add-service=ntp
+[root@controller ~]# firewall-cmd --reload
+
+
+
+## compute && storage nodes same steps ##
+
+#chrony.conf edit pool adres from 2.centos... to controller
+[root@compute ~]# vi /etc/chrony.conf
+pool controller iburst
+#restart chrony
+[root@compute ~]# systemctl restart chronyd
+
+#add fw rule for ntp && reload
+[root@compute ~]# firewall-cmd --permanent --add-service=ntp
+[root@compute ~]# firewall-cmd --reload
+
+#check if it returns controller as time source
+[root@compute ~]# chronyc sources
+210 Number of sources = 1
+MS Name/IP address         Stratum Poll Reach LastRx Last sample               
+===============================================================================
+^? controller                    0   7     0     -     +0ns[   +0ns] +/-    0ns
+
+
+## controller - keystone ##
+#...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

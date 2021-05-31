@@ -1,4 +1,4 @@
-## Controller-Glance ##
+## controller-glance ##
 
 ## controller ##
 
@@ -87,33 +87,8 @@ flavor = keystone
 #populate the image service db
 [root@controller ~]# su -s /bin/sh -c "glance-manage db_sync" glance
 
-#selinux boolean for glance
-[root@controller ~]# setsebool -P glance_api_can_network on
-
-#create glanceapi.te file
-[root@controller ~]# vi glanceapi.te
-#copy&&paste below before ">>>>>" sign
-module glanceapi 1.0;
-
-require {
-        type glance_api_t;
-        type httpd_config_t;
-        type iscsid_exec_t;
-        class dir search;
-        class file { getattr open read };
-}
-
-#========== glance_api_t ============
-allow glance_api_t httpd_config_t:dir search;
-allow glance_api_t iscsid_exec_t:file { getattr open read};
->>>>>
-#save and exit
-#compile policy for selinux
-[root@controller ~]# checkmodule -m -M -o glanceapi.mod glanceapi.te
-#create selinux module package
-[root@controller ~]# semodule_package --outfile glanceapi.pp --module glanceapi.mod
-#install module package
-[root@controller ~]# semodule -i glanceapi.pp
+#selinux booleans and policies for glance
+#...
 
 #enable and start service
 [root@controller ~]# systemctl enable openstack-glance-api.service

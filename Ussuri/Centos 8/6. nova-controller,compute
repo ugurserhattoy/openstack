@@ -1,4 +1,4 @@
-## nova controller && compute ##
+## nova controller##
 
 #
 [root@controller ~]# mysql -u root -p
@@ -119,6 +119,84 @@ user_domain_name = Default
 auth_url = http://controller:5000/v3
 username = placement
 password = YOUR_PLACEMENT_PASS
+
+#save&&exit
+
+#fw add port
+[root@controller ~]# firewall-cmd --permanent --add-port={6080,6081,6082,8774,8775,8778}/tcp
+
+[root@controller ~]# firewall-cmd --reload
+
+#populate nova-api db
+[root@controller ~]# su -s /bin/sh -c "nova-manage api_db sync" nova
+
+#register ce110 db
+[root@controller ~]# su -s /bin/sh -c "nova-manage cell_v2 map_cell0" nova
+
+#create ce111 cell
+[root@controller ~]# su -s /bin/sh -c "nova-manage cell_v2 create_cell --name=cell1 --verbose" nova
+
+#populate nova db
+[root@controller ~]# su -s /bin/sh -c "nova-manage db sync" nova
+
+#verify nova cell0 & cell1 are registered correctly
+[root@controller ~]# su -s /bin/sh -c "nova-manage cell_v2 list_cells" nova
++-------+--------------------------------------+---------------+-------------------------------------------------+----------+
+|  Name |                 UUID                 | Transport URL |               Database Connection               | Disabled |
++-------+--------------------------------------+---------------+-------------------------------------------------+----------+
+| cell0 | 00000000-0000-0000-0000-000000000000 |     none:/    | mysql+pymysql://nova:****@controller/nova_cell0 |  False   |
+| cell1 | 8bbe3386-b680-4c27-b4bb-8e55444ea0d6 |    rabbit:    |    mysql+pymysql://nova:****@controller/nova    |  False   |
++-------+--------------------------------------+---------------+-------------------------------------------------+----------+
+
+
+#enable&&start compute services
+root@controller ~]# systemctl enable \
+>     openstack-nova-api.service \
+>     openstack-nova-scheduler.service \
+>     openstack-nova-conductor.service \
+>     openstack-nova-novncproxy.service
+
+[root@controller ~]# systemctl start \
+>     openstack-nova-api.service \
+>     openstack-nova-scheduler.service \
+>     openstack-nova-conductor.service \
+>     openstack-nova-novncproxy.service
+
+
+
+
+## compute ##
+
+#enable ussuri and powertools repos
+[root@compute ~]# dnf -y install centos-release-openstack-ussuri
+[root@compute ~]# sed -i -e "s/enabled=1/enabled=0/g" /etc/yum.repos.d/CentOS-OpenStack-ussuri.repo
+[root@compute ~]# dnf --enablerepo=centos-openstack-ussuri -y upgrade
+#install nova-compute and selinux packs
+[root@compute ~]# dnf --enablerepo=centos-openstack-ussuri,powertools -y install openstack-nova-compute openstack-selinux
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

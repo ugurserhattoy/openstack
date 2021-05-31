@@ -1,0 +1,76 @@
+### SELINUX && OVS PARTS ###
+
+>=======keystone========<
+
+#set selinux booleans to allow httpd connections and access
+[root@controller /]# setsebool -P httpd_use_openstack on
+[root@controller /]# setsebool -P httpd_can_network_connect on
+[root@controller /]# setsebool -P httpd_can_network_connect_db on
+
+
+>=======glance========<
+
+#selinux boolean for glance
+[root@controller ~]# setsebool -P glance_api_can_network on
+
+#create glanceapi.te file
+[root@controller ~]# vi glanceapi.te
+#copy&&paste below before ">>>>>" sign
+module glanceapi 1.0;
+
+require {
+        type glance_api_t;
+        type httpd_config_t;
+        type iscsid_exec_t;
+        class dir search;
+        class file { getattr open read };
+}
+
+#========== glance_api_t ============
+allow glance_api_t httpd_config_t:dir search;
+allow glance_api_t iscsid_exec_t:file { getattr open read};
+>>>>>
+#save and exit
+#compile policy for selinux
+[root@controller ~]# checkmodule -m -M -o glanceapi.mod glanceapi.te
+#create selinux module package
+[root@controller ~]# semodule_package --outfile glanceapi.pp --module glanceapi.mod
+#install module package
+[root@controller ~]# semodule -i glanceapi.pp
+
+
+
+>===========neutron===========<
+
+#selinux booleans
+[root@controller ~]# setsebool -P neutron_can_network on
+[root@controller ~]# setsebool -P haproxy_connect_any on
+[root@controller ~]# setsebool -P daemons_enable_cluster_mode on
+
+#create new
+[root@controller ~]# vi my-ovsofctl.te
+
+module my-ovsofctl 1.0;
+
+require {
+        type neutron_t;
+        class capability sys_rawio;
+}
+
+#============= neutron_t ==============
+allow neutron_t self:capability sys_rawio;
+
+
+[root@controller ~]# checkmodule -m -M -o my-ovsofctl.mod my-ovsofctl.te
+[root@controller ~]# semodule_package --outfile my-ovsofctl.pp --module my-ovsofctl.mod
+[root@controller ~]# semodule -i my-ovsofctl.pp
+
+
+
+
+
+
+
+
+
+
