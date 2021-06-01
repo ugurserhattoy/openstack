@@ -17,7 +17,7 @@ memcached       hard    nofile          6144
  
 #2.checked ports if 11211 was already listening / DIDN'T WORK
 
-================openstack-nova-api.service============== SOLVED!
+==========openstack-nova-api.service======== SOLVED!*****
 [root@controller ~]# systemctl status openstack-nova-api.service
 ● openstack-nova-api.service - OpenStack Nova API Server
    Loaded: loaded (/usr/lib/systemd/system/openstack-nova-api.service; disabled; vendor preset: disable>
@@ -25,3 +25,13 @@ memcached       hard    nofile          6144
 
 #enabled service again / SOLVED ^^
 systemctl enable openstack-nova-api.service 
+
+
+==========nova controller create the cell1==========
+
+[root@controller /]# su -s /bin/sh -c "nova-manage cell_v2 create_cell --name=cell1 --verbose" nova
+--transport-url not provided in the command line, using the value [DEFAULT]/transport_url from the configuration file
+--database_connection not provided in the command line, using the value [database]/connection from the configuration file
+The specified transport_url and/or database_connection combination already exists for another cell with uuid e1f7b516-2a41-4cf9-82e5-51fd01109e1e
+
+
